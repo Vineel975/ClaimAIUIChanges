@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* ── Premium light theme ──────────────────────────────────────────────
+     Refined near-neutrals with a faint cool tint + a confident indigo accent.
+     Replaces the flat pure-grayscale defaults for a clinical-but-premium feel. */
+  --background: oklch(0.985 0.003 264);      /* faintly cool off-white */
+  --foreground: oklch(0.21 0.018 264);       /* deep ink, slight blue */
+  --card: oklch(1 0 0);                      /* crisp white cards for elevation */
+  --card-foreground: oklch(0.21 0.018 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.018 264);
+  --primary: oklch(0.52 0.19 266);           /* premium indigo — the signature accent */
+  --primary-foreground: oklch(0.985 0.003 264);
+  --secondary: oklch(0.965 0.005 264);
+  --secondary-foreground: oklch(0.27 0.02 264);
+  --muted: oklch(0.965 0.005 264);
+  --muted-foreground: oklch(0.52 0.022 264);
+  --accent: oklch(0.95 0.022 266);           /* faint indigo-tinted surface */
+  --accent-foreground: oklch(0.34 0.12 266);
+  --destructive: oklch(0.58 0.22 27.3);
+  --border: oklch(0.918 0.006 264);
+  --input: oklch(0.918 0.006 264);
+  --ring: oklch(0.52 0.19 266);              /* focus ring = accent */
+  --chart-1: oklch(0.55 0.19 266);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0.003 264);
+  --sidebar-foreground: oklch(0.21 0.018 264);
+  --sidebar-primary: oklch(0.52 0.19 266);
+  --sidebar-primary-foreground: oklch(0.985 0.003 264);
+  --sidebar-accent: oklch(0.95 0.022 266);
+  --sidebar-accent-foreground: oklch(0.34 0.12 266);
+  --sidebar-border: oklch(0.918 0.006 264);
+  --sidebar-ring: oklch(0.52 0.19 266);
+}
+
+.dark {
+  /* ── Premium dark theme ───────────────────────────────────────────────
+     Deep slate base with a faint blue cast (not pure black) + brighter indigo
+     accent for contrast. Elevated card surfaces for depth. */
+  --background: oklch(0.17 0.012 264);       /* deep slate, faint blue */
+  --foreground: oklch(0.965 0.004 264);
+  --card: oklch(0.215 0.015 264);            /* elevated surface */
+  --card-foreground: oklch(0.965 0.004 264);
+  --popover: oklch(0.215 0.015 264);
+  --popover-foreground: oklch(0.965 0.004 264);
+  --primary: oklch(0.66 0.18 266);           /* brighter indigo on dark */
+  --primary-foreground: oklch(0.16 0.012 264);
+  --secondary: oklch(0.265 0.015 264);
+  --secondary-foreground: oklch(0.965 0.004 264);
+  --muted: oklch(0.265 0.015 264);
+  --muted-foreground: oklch(0.705 0.016 264);
+  --accent: oklch(0.3 0.04 266);
+  --accent-foreground: oklch(0.92 0.03 266);
+  --destructive: oklch(0.7 0.19 22.2);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.66 0.18 266);
+  --chart-1: oklch(0.66 0.18 266);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.195 0.013 264);
+  --sidebar-foreground: oklch(0.965 0.004 264);
+  --sidebar-primary: oklch(0.66 0.18 266);
+  --sidebar-primary-foreground: oklch(0.16 0.012 264);
+  --sidebar-accent: oklch(0.3 0.04 266);
+  --sidebar-accent-foreground: oklch(0.92 0.03 266);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.66 0.18 266);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Premium display font for headings — opt-in via .font-display */
+  .font-display {
+    font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+    letter-spacing: -0.011em;
+  }
+  /* Smooth, subtle transition when switching light/dark (presentation only). */
+  :root, .dark {
+    --theme-transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  }
+}
+
+/* Tariff amount highlight — applied via JS after scrolling to page */
+.tariff-highlight {
+  background: rgba(251, 191, 36, 0.55) !important;
+  border-radius: 3px !important;
+  padding: 1px 3px !important;
+  outline: 2px solid rgba(217, 119, 6, 0.7);
+  outline-offset: 1px;
+  transition: background 0.3s ease;
+}
