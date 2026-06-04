@@ -1,1 +1,5 @@
-2565_Fortis_Hospitals_Ltd__Noida_12_06_2018_31_12_2030_134057742201543556.zip
+SELECT Doc.Id, Doc.FileName, Doc.SystemFileName, Doc.Status, Doc.CreatedDateTime
+FROM ProviderTariffDocs Doc WITH(NOLOCK)
+INNER JOIN ProviderTariff_Map Mp WITH(NOLOCK) ON Doc.Id = Mp.DocumentId
+WHERE Mp.ProviderID = 4140 AND Doc.Status = 1 AND Mp.Status = 1
+ORDER BY Doc.CreatedDateTime DESC;
