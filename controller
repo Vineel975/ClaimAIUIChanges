@@ -146,140 +146,152 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
         string docPath = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPath"] ?? "TariffDocs/";
         string webShare2 = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPathWebShare"] ?? "WebShareDocs/";
 
-        // List ALL active tariff docs mapped to this provider — by SystemFileName.
-        //
-        // IMPORTANT: the previous "AND Doc.FileName LIKE '%.pdf'" filter was REMOVED.
-        // Tariffs in S3 are stored as ZIP archives (e.g.
-        // 4140/tariffdocs/2565_..._134057742201543556.zip), so the PDF filter was
-        // excluding the real tariff and matching only a stray legacy .pdf row.
-        // We also dropped the MOUID=0 "isOldDoc" heuristic — it mis-flagged this file as
-        // old and sent the download to WebShareDocs/. The actual location is resolved by
-        // probing in the download loop below.
-        var tariffFiles = new System.Collections.Generic.List<System.Tuple<string, DateTime>>();
+        // Enumerate ALL tariff DOC IDs mapped to this provider, restricted to file types
+        // the PDF pipeline can consume (.pdf and .zip; .xls/.xlsx are skipped). We do NOT
+        // filter by MOU here: a tariff mapped under a different MOU is still a real file,
+        // and the previous "AND (Mp.MOUID = @MOUID OR Mp.MOUID = 0)" filter was discarding
+        // valid tariffs (incl. the current one). Insurer relevance is decided downstream
+        // by PickTariffFileWithAI from the filenames, not by this query. Each doc's REAL
+        // S3 key is resolved per-doc below from Usp_TariffUploadDoc_FillDetails — the same
+        // source the working "Tariff Documents" screen uses.
+        var tariffDocs = new System.Collections.Generic.List<System.Tuple<long, DateTime>>();
         using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
         {
             conn.Open();
             var cmd = conn.CreateCommand();
             cmd.CommandType = System.Data.CommandType.Text;
 
-            bool hasMou = !string.IsNullOrEmpty(mouId) && mouId != "-1";
-            string mouFilter = hasMou
-                ? "AND (Mp.MOUID = @MOUID OR Mp.MOUID = 0)"
-                : "";
-
             cmd.CommandText = @"
-                SELECT Doc.SystemFileName, MAX(Doc.CreatedDateTime) AS UpdateDate
+                SELECT Doc.Id AS DocId, MAX(Doc.CreatedDateTime) AS UpdateDate
                 FROM ProviderTariffDocs Doc WITH(NOLOCK)
                 INNER JOIN ProviderTariff_Map Mp WITH(NOLOCK) ON Doc.Id = Mp.DocumentId
                 WHERE Mp.ProviderID = @ProviderID
                   AND Doc.Status = 1
                   AND Mp.Status  = 1
                   AND (Doc.SystemFileName LIKE '%.pdf' OR Doc.SystemFileName LIKE '%.zip')
-                  " + mouFilter + @"
-                GROUP BY Doc.SystemFileName
+                GROUP BY Doc.Id
                 ORDER BY MAX(Doc.CreatedDateTime) DESC";
 
             cmd.Parameters.AddWithValue("@ProviderID", providerId);
-            if (hasMou) cmd.Parameters.AddWithValue("@MOUID", mouId);
 
             using (var rdr = cmd.ExecuteReader())
             {
                 while (rdr.Read())
                 {
-                    string sysFileName = rdr["SystemFileName"]?.ToString();
-                    if (string.IsNullOrWhiteSpace(sysFileName)) continue;
+                    if (rdr.IsDBNull(rdr.GetOrdinal("DocId"))) continue;
+                    long docId = Convert.ToInt64(rdr["DocId"]);
 
                     DateTime updateDate = rdr.IsDBNull(rdr.GetOrdinal("UpdateDate"))
                         ? DateTime.MinValue
                         : Convert.ToDateTime(rdr["UpdateDate"]);
 
-                    tariffFiles.Add(System.Tuple.Create(sysFileName, updateDate));
+                    tariffDocs.Add(System.Tuple.Create(docId, updateDate));
                 }
             }
         }
 
-        if (tariffFiles.Count == 0)
+        if (tariffDocs.Count == 0)
         {
             res.Success = false;
             res.Message = "No tariff files found for providerId=" + providerId;
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Download each tariff object with a region-only S3 client (IAM-role auth, same
-        // as the working screen) using synchronous GetObject (keeps this action sync).
-        // For each SystemFileName we PROBE the two possible locations, first hit wins:
-        //    1. {providerId}/{ProviderTariffDocumentPath}{SystemFileName}   (normal)
-        //    2. {ProviderTariffDocumentPathWebShare}{SystemFileName}        (legacy flat)
-        // This removes any dependence on an isOldDoc flag. Tariffs are usually ZIPs, so
-        // a downloaded .zip is expanded via CollectTariffFilesFromZip (exactly like the
-        // local-zip branch); non-zip objects are added as-is. Either way the candidates
-        // feed PickTariffFileWithAI. Real S3 errors are logged to Elmah per object.
+        // For each mapped doc, resolve its S3 key the SAME way the working "Tariff
+        // Documents" screen does (DownloadTariffDoc / ViewTariffDocument):
+        //   DataTable dt = GetTariffDocsInfo(0, "", FileId);   // Usp_TariffUploadDoc_FillDetails
+        //   string buckName = dt["ProviderId"] + "/" + ProviderTariffDocumentPath;
+        //   if (dt["isOldDoc"] == "yes") buckName = ProviderTariffDocumentPathWebShare;
+        //   key = buckName + dt["SystemFileName"];
+        // i.e. the owner ProviderId and isOldDoc come straight from the SP — identical
+        // logic, so the key matches the working screen exactly.
+        //
+        // Download auth is the region-only IAM-role client (same as the screen's
+        // DownloadFileAsync). We use synchronous GetObject instead of awaiting
+        // DownloadFileAsync only because this action is synchronous — the auth and the
+        // resulting bytes are identical. A downloaded .zip is expanded via
+        // CollectTariffFilesFromZip (same as the local-zip branch) so PickTariffFileWithAI
+        // always receives PDFs. Per-doc S3 errors are logged to Elmah.
         var s3TariffCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
 
         using (var s3Client = new Amazon.S3.AmazonS3Client(Amazon.RegionEndpoint.APSouth1))
         {
-            foreach (var tf in tariffFiles)
+            foreach (var td in tariffDocs)
             {
-                string sysName = tf.Item1;
-                DateTime modDate = tf.Item2;
-                if (string.IsNullOrWhiteSpace(sysName)) continue;
+                long docId = td.Item1;
+                DateTime modDate = td.Item2;
 
-                string[] candidateKeys = new[]
-                {
-                    providerId.ToString() + "/" + docPath + sysName,
-                    webShare2 + sysName
-                };
+                string ownerProviderId = null;
+                string sysName = null;
+                string isOldDoc = "no";
 
-                byte[] objBytes = null;
-                foreach (var key in candidateKeys)
+                // Authoritative per-doc info — identical source/columns to the working
+                // screen's GetTariffDocsInfo(0, "", FileId). SP signature:
+                // (@ProviderID bigint, @MOUId varchar, @TariffDocId bigint, @Type varchar).
+                using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
                 {
-                    try
+                    conn.Open();
+                    var infoCmd = conn.CreateCommand();
+                    infoCmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    infoCmd.CommandText = "Usp_TariffUploadDoc_FillDetails";
+                    infoCmd.Parameters.AddWithValue("@ProviderID", 0L);
+                    infoCmd.Parameters.AddWithValue("@MOUId", "");
+                    infoCmd.Parameters.AddWithValue("@TariffDocId", docId);
+                    infoCmd.Parameters.AddWithValue("@Type", "Mapped");
+                    using (var ir = infoCmd.ExecuteReader())
                     {
-                        var getReq = new Amazon.S3.Model.GetObjectRequest { BucketName = s3Bucket, Key = key };
-                        using (var getResp = s3Client.GetObject(getReq))
-                        using (var ms = new System.IO.MemoryStream())
+                        if (ir.Read())
                         {
-                            getResp.ResponseStream.CopyTo(ms);
-                            objBytes = ms.ToArray();
+                            ownerProviderId = ir["ProviderId"]?.ToString();
+                            sysName = ir["SystemFileName"]?.ToString();
+                            isOldDoc = (ir["isOldDoc"]?.ToString() ?? "no").ToLower().Trim();
                         }
-                        if (objBytes != null && objBytes.Length > 0) break; // got it
-                    }
-                    catch (Amazon.S3.AmazonS3Exception s3ex)
-                    {
-                        // NoSuchKey / 404 -> wrong location, try the next candidate key.
-                        if (s3ex.ErrorCode == "NoSuchKey" || (int)s3ex.StatusCode == 404)
-                            continue;
-                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
-                                          " Key=" + key + " — " + s3ex.Message, s3ex)));
-                    }
-                    catch (Exception s3ex)
-                    {
-                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
-                                          " Key=" + key + " — " + s3ex.Message, s3ex)));
                     }
                 }
 
-                if (objBytes == null || objBytes.Length == 0)
+                if (string.IsNullOrWhiteSpace(sysName))
                 {
                     Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                        new Exception("Tariff S3: no object found for SystemFileName=" + sysName +
-                                      " (tried: " + string.Join("  |  ", candidateKeys) + ")")));
+                        new Exception("Tariff doc has no SystemFileName from SP. DocId=" + docId)));
                     continue;
                 }
 
-                if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                // EXACT working-screen key construction.
+                string buckName = ownerProviderId + "/" + docPath;
+                if (isOldDoc == "yes") buckName = webShare2;
+                string s3Key = buckName + sysName;
+
+                try
                 {
-                    // Expand the zip into individual tariff files, same as the local branch.
-                    using (var zipStream = new System.IO.MemoryStream(objBytes))
+                    var getReq = new Amazon.S3.Model.GetObjectRequest { BucketName = s3Bucket, Key = s3Key };
+                    byte[] objBytes;
+                    using (var getResp = s3Client.GetObject(getReq))
+                    using (var ms = new System.IO.MemoryStream())
                     {
-                        CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
+                        getResp.ResponseStream.CopyTo(ms);
+                        objBytes = ms.ToArray();
+                    }
+
+                    if (objBytes == null || objBytes.Length == 0) continue;
+
+                    if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Expand the zip into individual tariff files, same as the local branch.
+                        using (var zipStream = new System.IO.MemoryStream(objBytes))
+                        {
+                            CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
+                        }
+                    }
+                    else
+                    {
+                        s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
                     }
                 }
-                else
+                catch (Exception s3ex)
                 {
-                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
+                    Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                        new Exception("Tariff S3 GetObject failed. Bucket=" + s3Bucket +
+                                      " Key=" + s3Key + " DocId=" + docId + " — " + s3ex.Message, s3ex)));
                 }
             }
         }
