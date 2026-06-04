@@ -137,12 +137,13 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Bucket + region are resolved INSIDE the proven DownloadFileAsync primitive
-        // (it uses the static ProviderDocbucketname + an IAM-role S3 client). We only
-        // need the two path keys here to build the object key exactly like the working
-        // "Tariff Documents" screen does. The old ProviderDocaccesskey/ProviderDocsecretkey
-        // reads were removed — those config credentials are the reason the presigned-URL
-        // download failed; the working path authenticates via the instance IAM role instead.
+        // S3 location config. The download client below is built REGION-ONLY, so it
+        // authenticates via the instance IAM role — exactly the auth the working
+        // "Tariff Documents" screen uses (ProviderController.DownloadFileAsync also
+        // does `new AmazonS3Client(region)` and has its BasicAWSCredentials line
+        // commented out). The old ProviderDocaccesskey/ProviderDocsecretkey reads were
+        // the root cause of the failure and have been removed.
+        string s3Bucket = System.Configuration.ConfigurationManager.AppSettings["ProviderDocbucketname"] ?? "prod-spectra-app-s3-provider-docs";
         string docPath = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPath"] ?? "TariffDocs/";
         string webShare2 = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPathWebShare"] ?? "TariffDocs/";
 
@@ -204,45 +205,56 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Download each tariff PDF using the SAME proven primitive the working
-        // "Tariff Documents" screen uses: ProviderController.DownloadFileAsync,
-        // which builds an AmazonS3Client(region) authenticated by the instance IAM
-        // role (NOT BasicAWSCredentials from config) and does a direct GetObjectAsync.
-        // The previous BasicAWSCredentials + presigned-URL + WebClient.DownloadData
-        // path failed on ap-south-1 (SigV4) and every WebException was swallowed by
-        // "catch { /* skip failed */ }", leaving s3TariffCandidates empty → the
-        // "Could not download any tariff files" fallback. DownloadFileAsync logs the
-        // real S3 error (NoSuchKey / AccessDenied / etc.) to Elmah per file.
-        // Key layout is unchanged — identical to DownloadTariffDoc:
+        // Download each tariff PDF with a REGION-ONLY S3 client (authenticates via the
+        // instance IAM role — same as the working "Tariff Documents" screen) and a
+        // SYNCHRONOUS GetObject. This stays fully synchronous, exactly like the original
+        // (GetPreSignedURL + WebClient were both sync) — no async-over-sync blocking.
+        //
+        // Root cause this fixes: the old code built `new BasicAWSCredentials(accessKey,
+        // secretKey)` from ProviderDocaccesskey/ProviderDocsecretkey. Those config keys
+        // are unused by the rest of the app (which relies on the IAM role) and were
+        // empty/stale, so every presigned-URL download failed and the silent
+        // `catch { /* skip failed */ }` left s3TariffCandidates empty.
+        //
+        // Per-file failures are now logged to Elmah with the real S3 error so a recurring
+        // failure can be diagnosed (NoSuchKey = key path, AccessDenied = role permission).
+        // Key layout is unchanged:
         //   not-old : {providerId}/{ProviderTariffDocumentPath}{SystemFileName}
         //   old     : {ProviderTariffDocumentPathWebShare}{SystemFileName}
         var s3TariffCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
-        var provCtrl = new ProviderController();
 
-        foreach (var tf in tariffFiles)
+        using (var s3Client = new Amazon.S3.AmazonS3Client(Amazon.RegionEndpoint.APSouth1))
         {
-            string sysName = tf.Item1;
-            DateTime modDate = tf.Item2;
-            string isOldDoc = tf.Item3;
-            string fileKey = isOldDoc == "yes"
-                ? webShare2 + sysName
-                : providerId.ToString() + "/" + docPath + sysName;
-            try
+            foreach (var tf in tariffFiles)
             {
-                // Sync call into the async primitive (this action is synchronous).
-                // DownloadFileAsync swallows its own S3 errors to Elmah and returns an
-                // empty array on failure, so we guard on Length to skip failed files.
-                byte[] pdfBytes = provCtrl
-                    .DownloadFileAsync(fileKey, Amazon.RegionEndpoint.APSouth1)
-                    .GetAwaiter().GetResult();
-                if (pdfBytes != null && pdfBytes.Length > 0)
-                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, pdfBytes));
-            }
-            catch (Exception s3ex)
-            {
-                Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                    new Exception("Tariff S3 download failed (DownloadFileAsync). Key=" +
-                                  fileKey + " — " + s3ex.Message, s3ex)));
+                string sysName = tf.Item1;
+                DateTime modDate = tf.Item2;
+                string isOldDoc = tf.Item3;
+                string s3Key = isOldDoc == "yes"
+                    ? webShare2 + sysName
+                    : providerId.ToString() + "/" + docPath + sysName;
+                try
+                {
+                    var getReq = new Amazon.S3.Model.GetObjectRequest
+                    {
+                        BucketName = s3Bucket,
+                        Key = s3Key
+                    };
+                    using (var getResp = s3Client.GetObject(getReq))
+                    using (var ms = new System.IO.MemoryStream())
+                    {
+                        getResp.ResponseStream.CopyTo(ms);
+                        byte[] pdfBytes = ms.ToArray();
+                        if (pdfBytes.Length > 0)
+                            s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, pdfBytes));
+                    }
+                }
+                catch (Exception s3ex)
+                {
+                    Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                        new Exception("Tariff S3 GetObject failed. Bucket=" + s3Bucket +
+                                      " Key=" + s3Key + " — " + s3ex.Message, s3ex)));
+                }
             }
         }
 
