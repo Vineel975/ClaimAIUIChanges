@@ -256,42 +256,71 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                     continue;
                 }
 
-                // EXACT working-screen key construction.
-                string buckName = ownerProviderId + "/" + docPath;
-                if (isOldDoc == "yes") buckName = webShare2;
-                string s3Key = buckName + sysName;
+                // Build the key the working screen's way (SP isOldDoc decides the
+                // primary location), but ALSO keep the other location as a fallback so a
+                // wrong/edge isOldDoc doesn't lose a file that actually exists. Try the
+                // authoritative location first, the other second; first hit wins.
+                //   provider-folder : {ownerProviderId}/{ProviderTariffDocumentPath}{SystemFileName}
+                //   legacy flat     : {ProviderTariffDocumentPathWebShare}{SystemFileName}
+                string folderKey = ownerProviderId + "/" + docPath + sysName;
+                string webShareKey = webShare2 + sysName;
+                string[] candidateKeys = (isOldDoc == "yes")
+                    ? new[] { webShareKey, folderKey }   // SP says old -> webshare first
+                    : new[] { folderKey, webShareKey };  // SP says new -> provider folder first
 
-                try
+                byte[] objBytes = null;
+                string usedKey = null;
+                foreach (var key in candidateKeys)
                 {
-                    var getReq = new Amazon.S3.Model.GetObjectRequest { BucketName = s3Bucket, Key = s3Key };
-                    byte[] objBytes;
-                    using (var getResp = s3Client.GetObject(getReq))
-                    using (var ms = new System.IO.MemoryStream())
+                    try
                     {
-                        getResp.ResponseStream.CopyTo(ms);
-                        objBytes = ms.ToArray();
-                    }
-
-                    if (objBytes == null || objBytes.Length == 0) continue;
-
-                    if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Expand the zip into individual tariff files, same as the local branch.
-                        using (var zipStream = new System.IO.MemoryStream(objBytes))
+                        var getReq = new Amazon.S3.Model.GetObjectRequest { BucketName = s3Bucket, Key = key };
+                        using (var getResp = s3Client.GetObject(getReq))
+                        using (var ms = new System.IO.MemoryStream())
                         {
-                            CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
+                            getResp.ResponseStream.CopyTo(ms);
+                            objBytes = ms.ToArray();
+                            usedKey = key;
                         }
+                        if (objBytes != null && objBytes.Length > 0) break; // got it
                     }
-                    else
+                    catch (Amazon.S3.AmazonS3Exception s3ex)
                     {
-                        s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
+                        // NoSuchKey / 404 -> wrong location, try the fallback key.
+                        if (s3ex.ErrorCode == "NoSuchKey" || (int)s3ex.StatusCode == 404)
+                            continue;
+                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
+                                          " Key=" + key + " DocId=" + docId + " — " + s3ex.Message, s3ex)));
+                    }
+                    catch (Exception s3ex)
+                    {
+                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
+                                          " Key=" + key + " DocId=" + docId + " — " + s3ex.Message, s3ex)));
                     }
                 }
-                catch (Exception s3ex)
+
+                if (objBytes == null || objBytes.Length == 0)
                 {
                     Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                        new Exception("Tariff S3 GetObject failed. Bucket=" + s3Bucket +
-                                      " Key=" + s3Key + " DocId=" + docId + " — " + s3ex.Message, s3ex)));
+                        new Exception("Tariff S3: no object found for DocId=" + docId +
+                                      " SystemFileName=" + sysName +
+                                      " (tried: " + string.Join("  |  ", candidateKeys) + ")")));
+                    continue;
+                }
+
+                if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Expand the zip into individual tariff files, same as the local branch.
+                    using (var zipStream = new System.IO.MemoryStream(objBytes))
+                    {
+                        CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
+                    }
+                }
+                else
+                {
+                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
                 }
             }
         }
