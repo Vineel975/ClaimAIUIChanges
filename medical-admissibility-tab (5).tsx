@@ -265,11 +265,11 @@ function IcdCombobox({
   const dropdown = open && portal ? (
     <div
       style={{ position: "absolute", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
-      className="rounded-lg border border-gray-200 bg-white shadow-2xl overflow-hidden"
+      className="rounded-lg border border-border bg-popover shadow-2xl overflow-hidden"
     >
       {/* Search input */}
-      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 bg-gray-50">
-        <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2 bg-muted/50">
+        <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
         <input
@@ -278,11 +278,11 @@ function IcdCombobox({
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Type ICD code or disease name…"
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
+          className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
         {query && (
           <button type="button" onClick={() => { setQuery(""); setResults([]); inputRef.current?.focus(); }}
-            className="text-gray-300 hover:text-gray-500">
+            className="text-muted-foreground hover:text-foreground">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -293,12 +293,12 @@ function IcdCombobox({
       {/* Results */}
       <div className="max-h-60 overflow-y-auto">
         {!query && (
-          <div className="px-4 py-3 text-xs text-gray-400">
+          <div className="px-4 py-3 text-xs text-muted-foreground">
             Start typing to search ICD-10 codes or disease names…
           </div>
         )}
         {loading && (
-          <div className="flex items-center gap-2 px-4 py-3 text-xs text-gray-400">
+          <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
             <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
             </svg>
@@ -306,22 +306,22 @@ function IcdCombobox({
           </div>
         )}
         {!loading && query && results.length === 0 && (
-          <div className="px-4 py-3 text-xs text-gray-400">No results for &ldquo;{query}&rdquo;</div>
+          <div className="px-4 py-3 text-xs text-muted-foreground">No results for &ldquo;{query}&rdquo;</div>
         )}
         {!loading && results.map((opt, i) => (
           <button
             key={opt.code}
             type="button"
             onClick={() => handleSelect(opt)}
-            className={`flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-blue-50 transition-colors ${i > 0 ? "border-t border-gray-50" : ""}`}
+            className={`flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-accent transition-colors ${i > 0 ? "border-t border-border" : ""}`}
           >
-            <span className="shrink-0 mt-0.5 rounded bg-blue-100 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
+            <span className="shrink-0 mt-0.5 rounded bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary">
               {opt.code}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-gray-800 leading-snug">{opt.description}</div>
+              <div className="text-sm text-foreground leading-snug">{opt.description}</div>
               {opt.level && (
-                <div className="mt-0.5 text-[10px] text-gray-400">Level {opt.level}</div>
+                <div className="mt-0.5 text-[10px] text-muted-foreground">Level {opt.level}</div>
               )}
             </div>
           </button>
@@ -338,16 +338,16 @@ function IcdCombobox({
           ref={triggerRef}
           type="button"
           onClick={openDropdown}
-          className={`flex w-full items-center justify-between gap-1 rounded-md border px-2 py-1.5 text-left text-xs transition-colors hover:border-blue-300 hover:bg-blue-50 ${
+          className={`flex w-full items-center justify-between gap-1 rounded-md border px-2 py-1.5 text-left text-xs transition-colors hover:border-primary/40 hover:bg-accent ${
             value
-              ? "border-blue-200 bg-blue-50 text-blue-700"
-              : "border-gray-200 bg-white text-gray-400"
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-border bg-card text-muted-foreground"
           }`}
         >
           <span className="flex-1 truncate font-mono font-medium">
             {value || placeholder}
           </span>
-          <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-3 w-3 shrink-0 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
@@ -355,11 +355,11 @@ function IcdCombobox({
         {/* Description below button */}
         {value && desc && (
           <div className="mt-0.5 flex items-start justify-between gap-1">
-            <span className="truncate text-[10px] text-blue-500 leading-tight flex-1" title={desc}>
+            <span className="truncate text-[10px] text-primary leading-tight flex-1" title={desc}>
               {desc}
             </span>
             <button type="button" onClick={handleClear}
-              className="shrink-0 text-gray-300 hover:text-red-400 transition-colors"
+              className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
               title="Clear">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -770,12 +770,12 @@ export function MedicalAdmissibilityTab({
               {/* Diagnosis + Supporting Report 2-column table — replaces plain Diagnosis text */}
               {(medicalAdmissibility.diagnosis || conditionRows.length > 0) && (
                 <div className="space-y-2">
-                  <div className="rounded-md border bg-white">
+                  <div className="rounded-md border border-border bg-card">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead className="font-semibold text-gray-700 w-1/2">Diagnosis</TableHead>
-                          <TableHead className="font-semibold text-gray-700 w-1/2">Supporting Report</TableHead>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="font-semibold text-muted-foreground w-1/2">Diagnosis</TableHead>
+                          <TableHead className="font-semibold text-muted-foreground w-1/2">Supporting Report</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -786,7 +786,7 @@ export function MedicalAdmissibilityTab({
                                 <input
                                   type="text"
                                   defaultValue={`${row.condition}${row.matchedDiagnosis ? ` (${row.matchedDiagnosis})` : ""}`}
-                                  className="w-full rounded border border-gray-200 px-2 py-1 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  className="w-full rounded border border-border px-2 py-1 text-sm text-foreground bg-background focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                                   onClick={(e) => e.stopPropagation()}
                                 />
                               </TableCell>
@@ -795,9 +795,9 @@ export function MedicalAdmissibilityTab({
                                 onClick={() => onScrollToPage && row.pageNumber && onScrollToPage(row.pageNumber)}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-700">{row.test}</span>
+                                  <span className="text-sm text-foreground">{row.test}</span>
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    row.reported === "Yes" ? "bg-green-100 text-green-800" : "bg-red-50 text-red-700"
+                                    row.reported === "Yes" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
                                   }`}>
                                     {row.reported === "Yes" ? "Available" : "Missing"}
                                   </span>
@@ -807,7 +807,7 @@ export function MedicalAdmissibilityTab({
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={2} className="text-sm text-gray-700 p-3">
+                            <TableCell colSpan={2} className="text-sm text-foreground p-3">
                               {medicalAdmissibility.diagnosis}
                             </TableCell>
                           </TableRow>
@@ -819,14 +819,14 @@ export function MedicalAdmissibilityTab({
               )}
               {medicalAdmissibility.doctorNotes && (
                 <div className="space-y-2">
-                  <div className="font-display text-base font-semibold text-gray-700">
+                  <div className="font-display text-base font-semibold text-foreground">
                     Doctor Notes From Hospital
                   </div>
                   <div
-                    className={`text-sm leading-relaxed text-gray-900 bg-gray-50 rounded-md p-3 border whitespace-pre-wrap ${
+                    className={`text-sm leading-relaxed text-foreground bg-muted/40 rounded-md p-3 border border-border whitespace-pre-wrap ${
                       onScrollToPage &&
                       medicalAdmissibility.doctorNotesPageNumber
-                        ? "cursor-pointer hover:bg-gray-100 transition-colors"
+                        ? "cursor-pointer hover:bg-muted/70 transition-colors"
                         : ""
                     }`}
                     onClick={() => {
@@ -854,7 +854,7 @@ export function MedicalAdmissibilityTab({
               {/* Presenting Complaint — moved here from result-view bottom */}
               {(presentingComplaint !== undefined) && (
                 <div className="space-y-2">
-                  <div className="font-display text-base font-semibold text-gray-700">Presenting Complaint</div>
+                  <div className="font-display text-base font-semibold text-foreground">Presenting Complaint</div>
                   <textarea
                     value={presentingComplaint ?? ""}
                     onChange={(e) => onPresentingComplaintChange?.(e.target.value)}
@@ -867,26 +867,26 @@ export function MedicalAdmissibilityTab({
 
               {/* Claim History — expandable dropdown (mirrors Spectra's Claim History tab) */}
               {claimId && (
-                <div className="rounded-md border border-indigo-200 bg-indigo-50/40">
+                <div className="rounded-md border border-primary/20 bg-primary/5">
                   <button
                     type="button"
                     onClick={() => setClaimHistoryOpen((v) => !v)}
-                    className="flex w-full items-center justify-between px-3 py-2 font-display text-base font-semibold text-gray-700 hover:bg-indigo-50"
+                    className="flex w-full items-center justify-between px-3 py-2 font-display text-base font-semibold text-foreground hover:bg-indigo-50"
                   >
                     <span>Claim History</span>
                     <span className="text-xs">{claimHistoryOpen ? "▲" : "▼"}</span>
                   </button>
                   {claimHistoryOpen && (
-                    <div className="border-t border-indigo-200 p-2">
+                    <div className="border-t border-primary/20 p-2">
                       {claimHistoryLoading ? (
-                        <div className="px-2 py-3 text-xs text-gray-500">Loading claim history…</div>
+                        <div className="px-2 py-3 text-xs text-muted-foreground">Loading claim history…</div>
                       ) : claimHistoryRows.length === 0 ? (
-                        <div className="px-2 py-3 text-xs text-gray-500">No claim history found.</div>
+                        <div className="px-2 py-3 text-xs text-muted-foreground">No claim history found.</div>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse text-xs">
                             <thead>
-                              <tr className="bg-indigo-100 text-left text-indigo-900">
+                              <tr className="bg-primary/10 text-left text-foreground">
                                 <th className="whitespace-nowrap px-2 py-1">Claim No.</th>
                                 <th className="whitespace-nowrap px-2 py-1">UHID</th>
                                 <th className="whitespace-nowrap px-2 py-1">Patient Name</th>
@@ -912,7 +912,7 @@ export function MedicalAdmissibilityTab({
                                   ? new Date(row.dateOfDischarge).toLocaleDateString("en-IN")
                                   : "";
                                 return (
-                                  <tr key={idx} className="border-t border-indigo-100 odd:bg-white even:bg-indigo-50/30">
+                                  <tr key={idx} className="border-t border-border odd:bg-card even:bg-muted/30">
                                     <td className="whitespace-nowrap px-2 py-1">
                                       {row.claimId}{row.slNo ? `/${row.slNo}` : ""}
                                     </td>
@@ -943,18 +943,18 @@ export function MedicalAdmissibilityTab({
 
               {conditionRows.length > 0 && (
                 <div className="space-y-2">
-                  <div className="font-display text-base font-semibold text-gray-700">
+                  <div className="font-display text-base font-semibold text-foreground">
                     Medical Coding
                   </div>
-                  <div className="rounded-md border bg-white overflow-x-auto">
+                  <div className="rounded-md border border-border bg-card overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50">
+                        <TableRow className="bg-muted/50">
                           {Array.from({ length: 7 }, (_, i) => (
-                            <TableHead key={i} className="min-w-[140px] font-semibold text-gray-700">{`ICD Code-${i + 1}`}</TableHead>
+                            <TableHead key={i} className="min-w-[140px] font-semibold text-muted-foreground">{`ICD Code-${i + 1}`}</TableHead>
                           ))}
-                          <TableHead className="font-semibold text-gray-700">Description</TableHead>
-                          <TableHead className="font-semibold text-gray-700">Reported</TableHead>
+                          <TableHead className="font-semibold text-muted-foreground">Description</TableHead>
+                          <TableHead className="font-semibold text-muted-foreground">Reported</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -964,7 +964,7 @@ export function MedicalAdmissibilityTab({
                             arr.findIndex((r) => r.conditionKey === row.conditionKey) === idx
                           )
                           .map((row, idx) => (
-                          <TableRow key={`icd-row-${idx}`} className={onScrollToPage && row.pageNumber ? "cursor-pointer hover:bg-gray-50" : ""}>
+                          <TableRow key={`icd-row-${idx}`} className={onScrollToPage && row.pageNumber ? "cursor-pointer hover:bg-muted/50" : ""}>
                             {Array.from({ length: 7 }, (_, i) => (
                               <TableCell key={i} className="align-top p-1">
                                 <IcdCombobox
@@ -974,7 +974,7 @@ export function MedicalAdmissibilityTab({
                                 />
                               </TableCell>
                             ))}
-                            <TableCell className="align-top text-xs text-gray-600">
+                            <TableCell className="align-top text-xs text-muted-foreground">
                               {(() => {
                                 for (let lvl = 6; lvl >= 0; lvl--) {
                                   const code = getICDLevel(lvl, row.conditionKey!);
@@ -985,7 +985,7 @@ export function MedicalAdmissibilityTab({
                             </TableCell>
                             <TableCell className="align-top" onClick={() => onScrollToPage && row.pageNumber && onScrollToPage(row.pageNumber)}>
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                row.reported === "Yes" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                row.reported === "Yes" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" : "bg-muted text-muted-foreground"
                               }`}>
                                 {row.reported}
                               </span>
