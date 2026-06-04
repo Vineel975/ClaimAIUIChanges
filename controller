@@ -46,12 +46,6 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
 
         if (!isProdOrPreprod)
         {
-            // CHECKPOINT 3a (Local/QA/UAT): Load tariff from zip file
-            // Path: ~/ClaimAIDocs/{claimId}/tariff.zip
-            // FAILURE HERE means:
-            //   - Zip file not placed in correct folder
-            //   - Wrong claimId passed
-            //   - Enviroment key in Web.config is wrong (should be qa/dev/uat)
             string localBase = Server.MapPath("~/ClaimAIDocs/");
             string zipPath = System.IO.Path.Combine(localBase, cId, "tariff.zip");
 
@@ -63,13 +57,6 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                 return Json(res, JsonRequestBehavior.AllowGet);
             }
 
-            // Recursively collect ALL tariff files from the zip — at any
-            // nesting depth. Files inside inner zips carry the full chain
-            // of inner-zip names as a prefix (".zip" stripped, joined by
-            // "_"); the outer root zip is NOT part of the prefix.
-            //   tariff.zip/file.pdf                 -> "file.pdf"
-            //   tariff.zip/gipsa.zip/file.pdf       -> "gipsa_file.pdf"
-            //   tariff.zip/gipsa.zip/2024.zip/f.pdf -> "gipsa_2024_f.pdf"
             var allTariffCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
             using (var rootStream = System.IO.File.OpenRead(zipPath))
             {
@@ -85,7 +72,6 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             {
                 TariffLog("[Tariff] STEP 2 — All candidate file names collected (" + allTariffCandidates.Count + "): " + string.Join(" | ", allTariffCandidates.ConvertAll(f => f.Item1 + " [" + f.Item2.ToString("yyyy-MM-dd") + "]")));
 
-                // Use AI to pick best file (names now carry the inner-zip prefix chain)
                 TariffLog("[Tariff] STEP 3 — Sending to AI for selection...");
                 var aiPicked = PickTariffFileWithAI(allTariffCandidates, isPsu, insurerCode);
                 tariffBytes = aiPicked?.Item2;
@@ -108,7 +94,6 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Content(sl2.Serialize(res), "application/json");
         }
 
-        // ── Prod/Preprod/Live: S3 via Usp_TariffUploadDoc_FillDetails ─────────
         long claimIdLong2 = 0;
         long.TryParse(cId, out claimIdLong2);
 
@@ -131,8 +116,6 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             var cmd = conn.CreateCommand();
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.CommandText = "USP_ClaimMedicalScrutiny_Retrieve";
-            // FIX #1: SP signature is (@ClaimID bigint, @Slno tinyint) — only 2 params.
-            // Removed @IsFrmArchived = 0 which caused "too many arguments specified" error.
             cmd.Parameters.AddWithValue("@ClaimID", claimIdLong2);
             cmd.Parameters.AddWithValue("@Slno", slNoInt);
             using (var rdr = cmd.ExecuteReader())
@@ -154,42 +137,15 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Get all tariff files from S3 for this provider
-        string s3Bucket = System.Configuration.ConfigurationManager.AppSettings["ProviderDocbucketname"] ?? "prod-spectra-app-s3-provider-docs";
+        // Bucket + region are resolved INSIDE the proven DownloadFileAsync primitive
+        // (it uses the static ProviderDocbucketname + an IAM-role S3 client). We only
+        // need the two path keys here to build the object key exactly like the working
+        // "Tariff Documents" screen does. The old ProviderDocaccesskey/ProviderDocsecretkey
+        // reads were removed — those config credentials are the reason the presigned-URL
+        // download failed; the working path authenticates via the instance IAM role instead.
         string docPath = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPath"] ?? "TariffDocs/";
         string webShare2 = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPathWebShare"] ?? "TariffDocs/";
-        string accessKey = System.Configuration.ConfigurationManager.AppSettings["ProviderDocaccesskey"];
-        string secretKey = System.Configuration.ConfigurationManager.AppSettings["ProviderDocsecretkey"];
 
-        // List all tariff files for this provider.
-        //
-        // FIX #2/#3/#4: Replaced the call to Usp_TariffUploadDoc_FillDetails with a direct
-        // query for three reasons:
-        //   #2 — The SP signature is (@ProviderID int, @MOUID varchar(max),
-        //        @TariffDocId int, @Type varchar(10)). The old code passed @Flag (wrong
-        //        param name) and was missing @Type, causing "expects parameter @TariffDocId"
-        //        error at runtime.
-        //   #3 — The SP result set does NOT contain a FileType column in any branch. The old
-        //        code's "if (!fileType.Contains(\"pdf\")) continue;" check would throw
-        //        IndexOutOfRangeException. We now filter PDFs via Doc.FileName LIKE '%.pdf'
-        //        directly in the WHERE clause.
-        //   #4 — The SP result set does NOT contain an isOldDoc column in branches 2/3/4
-        //        (only branch 1 returns it). The old code's "rdr[\"isOldDoc\"]" read would
-        //        throw IndexOutOfRangeException. We now compute IsOldDoc inline using the
-        //        same logic as branch 1 of the SP body: a doc is "old" if it has a mapping
-        //        with mouid = 0.
-        //
-        // Behavior decisions worth flagging:
-        //   (a) When mouId is non-empty: include both MOU-specific mappings AND mouid=0
-        //       fallback mappings. SP branch 3 only returns MOU-specific. This change is
-        //       intentional — without the fallback, claims whose providers only have
-        //       generic (non-MOU-specific) tariffs would return no files, which is the
-        //       documented complaint that motivated this refactor.
-        //   (b) When mouId is empty: skip the MOU filter entirely (matches SP branch 4
-        //       which returns all files for the provider).
-        //   (c) GROUP BY on Doc.Id deduplicates rows when a document has multiple mappings
-        //       (e.g. mapped to claim's MOU AND mouid=0). Otherwise the foreach loop below
-        //       would download the same S3 object twice.
         var tariffFiles = new System.Collections.Generic.List<System.Tuple<string, DateTime, string, string>>();
         using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
         {
@@ -197,13 +153,10 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             var cmd = conn.CreateCommand();
             cmd.CommandType = System.Data.CommandType.Text;
 
-            // hasMou is false when mouId is empty OR "-1". This matches SP branch
-            // condition `@MOUID != '' and @MOUID != '-1'` — both values mean "no MOU
-            // specified" and trigger the unfiltered branch 4 of the original SP.
             bool hasMou = !string.IsNullOrEmpty(mouId) && mouId != "-1";
             string mouFilter = hasMou
                 ? "AND (Mp.MOUID = @MOUID OR Mp.MOUID = 0)"
-                : ""; // empty/-1 MOU → no filter (matches SP branch 4 behavior)
+                : "";
 
             cmd.CommandText = @"
                 SELECT
@@ -251,37 +204,45 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Download all tariff PDFs from S3 and pick best by rules
-        var s3Creds = new Amazon.Runtime.BasicAWSCredentials(accessKey, secretKey);
-        var s3Region = Amazon.RegionEndpoint.APSouth1;
+        // Download each tariff PDF using the SAME proven primitive the working
+        // "Tariff Documents" screen uses: ProviderController.DownloadFileAsync,
+        // which builds an AmazonS3Client(region) authenticated by the instance IAM
+        // role (NOT BasicAWSCredentials from config) and does a direct GetObjectAsync.
+        // The previous BasicAWSCredentials + presigned-URL + WebClient.DownloadData
+        // path failed on ap-south-1 (SigV4) and every WebException was swallowed by
+        // "catch { /* skip failed */ }", leaving s3TariffCandidates empty → the
+        // "Could not download any tariff files" fallback. DownloadFileAsync logs the
+        // real S3 error (NoSuchKey / AccessDenied / etc.) to Elmah per file.
+        // Key layout is unchanged — identical to DownloadTariffDoc:
+        //   not-old : {providerId}/{ProviderTariffDocumentPath}{SystemFileName}
+        //   old     : {ProviderTariffDocumentPathWebShare}{SystemFileName}
         var s3TariffCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
+        var provCtrl = new ProviderController();
 
-        using (var s3Client = new Amazon.S3.AmazonS3Client(s3Creds, s3Region))
+        foreach (var tf in tariffFiles)
         {
-            foreach (var tf in tariffFiles)
+            string sysName = tf.Item1;
+            DateTime modDate = tf.Item2;
+            string isOldDoc = tf.Item3;
+            string fileKey = isOldDoc == "yes"
+                ? webShare2 + sysName
+                : providerId.ToString() + "/" + docPath + sysName;
+            try
             {
-                string sysName = tf.Item1;
-                DateTime modDate = tf.Item2;
-                string isOldDoc = tf.Item3;
-                string s3Key = isOldDoc == "yes"
-                    ? webShare2 + sysName
-                    : providerId.ToString() + "/" + docPath + sysName;
-                try
-                {
-                    var request = new Amazon.S3.Model.GetPreSignedUrlRequest
-                    {
-                        BucketName = s3Bucket,
-                        Key = s3Key,
-                        Expires = DateTime.Now.AddMinutes(15)
-                    };
-                    string presignedUrl = s3Client.GetPreSignedURL(request);
-                    using (var wc = new System.Net.WebClient())
-                    {
-                        byte[] pdfBytes = wc.DownloadData(presignedUrl);
-                        s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, pdfBytes));
-                    }
-                }
-                catch { /* skip failed */ }
+                // Sync call into the async primitive (this action is synchronous).
+                // DownloadFileAsync swallows its own S3 errors to Elmah and returns an
+                // empty array on failure, so we guard on Length to skip failed files.
+                byte[] pdfBytes = provCtrl
+                    .DownloadFileAsync(fileKey, Amazon.RegionEndpoint.APSouth1)
+                    .GetAwaiter().GetResult();
+                if (pdfBytes != null && pdfBytes.Length > 0)
+                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, pdfBytes));
+            }
+            catch (Exception s3ex)
+            {
+                Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                    new Exception("Tariff S3 download failed (DownloadFileAsync). Key=" +
+                                  fileKey + " — " + s3ex.Message, s3ex)));
             }
         }
 
