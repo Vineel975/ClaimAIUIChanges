@@ -9,7 +9,6 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
-import { tabsListVariants } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -1670,7 +1669,7 @@ export function ResultView({
         {/* Tabs Content - Left Side */}
         <ResizablePanel
           defaultSize={40}
-          className="flex h-full min-w-0 flex-col overflow-hidden border-r border-slate-200/80 bg-gradient-to-b from-slate-50 to-white"
+          className="flex h-full min-w-0 flex-col overflow-hidden border-r border-border bg-background"
         >
           {shouldShowProcessingLogs ? (
             <ProcessingLogs
@@ -1682,16 +1681,13 @@ export function ResultView({
             />
           ) : selectedFileResult && selectedAnalysis ? (
             <div className="flex h-full w-full flex-col overflow-hidden">
-              <div className="sticky top-0 z-10 w-full bg-background px-3 py-2">
+              <div className="sticky top-0 z-10 w-full border-b border-border bg-background/80 px-3 py-2.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center gap-2">
                   <div className="group/tabs flex-1" data-orientation="horizontal">
                     <div
                       data-slot="tabs-list"
                       data-variant="default"
-                      className={cn(
-                        tabsListVariants({ variant: "default" }),
-                         "grid w-full grid-cols-3",
-                      )}
+                      className="grid w-full grid-cols-3 gap-1 rounded-lg border border-border bg-muted/50 p-1"
                     >
                       {reportSections.map((section) => (
                         <button
@@ -1715,10 +1711,11 @@ export function ResultView({
                             }
                           }}
                            className={cn(
-                             "gap-1.5 rounded-md border border-transparent px-1.5 py-1 text-sm font-medium group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground/60 hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center whitespace-nowrap transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-                             "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
-                             "data-active:bg-background dark:data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 data-active:text-foreground",
-                             "after:bg-foreground after:absolute after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+                             "relative inline-flex h-7 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-medium transition-all duration-200",
+                             "text-muted-foreground hover:text-foreground",
+                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                             "disabled:pointer-events-none disabled:opacity-50",
+                             "data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-sm data-[active=true]:font-semibold",
                             )}
                         >
                           {section.label}
@@ -1933,9 +1930,9 @@ export function ResultView({
           )}
         </ResizablePanel>
 
-        <ResizableHandle withHandle className="bg-slate-200/90" />
+        <ResizableHandle withHandle className="bg-border" />
 
-        <ResizablePanel defaultSize={60} className="h-full min-w-0 overflow-hidden bg-white">
+        <ResizablePanel defaultSize={60} className="h-full min-w-0 overflow-hidden bg-card">
           <PdfViewerPanel
             activePdfFile={activePdfFile}
             onActivePdfChange={(value) =>
