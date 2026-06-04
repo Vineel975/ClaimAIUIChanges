@@ -137,17 +137,25 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // S3 location config. The download client below is built REGION-ONLY, so it
-        // authenticates via the instance IAM role — exactly the auth the working
-        // "Tariff Documents" screen uses (ProviderController.DownloadFileAsync also
-        // does `new AmazonS3Client(region)` and has its BasicAWSCredentials line
-        // commented out). The old ProviderDocaccesskey/ProviderDocsecretkey reads were
-        // the root cause of the failure and have been removed.
+        // S3 location config. The download client below is region-only -> IAM-role auth
+        // (same as the working "Tariff Documents" screen). The ProviderDocaccesskey/
+        // ProviderDocsecretkey reads were removed (they were the credential root cause).
+        // NOTE: ProviderTariffDocumentPath is CASE-SENSITIVE in S3 (e.g. "tariffdocs/"
+        // vs "TariffDocs/") — it must match the real bucket folder exactly.
         string s3Bucket = System.Configuration.ConfigurationManager.AppSettings["ProviderDocbucketname"] ?? "prod-spectra-app-s3-provider-docs";
         string docPath = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPath"] ?? "TariffDocs/";
-        string webShare2 = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPathWebShare"] ?? "TariffDocs/";
+        string webShare2 = System.Configuration.ConfigurationManager.AppSettings["ProviderTariffDocumentPathWebShare"] ?? "WebShareDocs/";
 
-        var tariffFiles = new System.Collections.Generic.List<System.Tuple<string, DateTime, string, string>>();
+        // List ALL active tariff docs mapped to this provider — by SystemFileName.
+        //
+        // IMPORTANT: the previous "AND Doc.FileName LIKE '%.pdf'" filter was REMOVED.
+        // Tariffs in S3 are stored as ZIP archives (e.g.
+        // 4140/tariffdocs/2565_..._134057742201543556.zip), so the PDF filter was
+        // excluding the real tariff and matching only a stray legacy .pdf row.
+        // We also dropped the MOUID=0 "isOldDoc" heuristic — it mis-flagged this file as
+        // old and sent the download to WebShareDocs/. The actual location is resolved by
+        // probing in the download loop below.
+        var tariffFiles = new System.Collections.Generic.List<System.Tuple<string, DateTime>>();
         using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
         {
             conn.Open();
@@ -160,21 +168,15 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                 : "";
 
             cmd.CommandText = @"
-                SELECT
-                    Doc.SystemFileName,
-                    Doc.FileName,
-                    MAX(Doc.CreatedDateTime) AS UpdateDate,
-                    MAX(CASE WHEN OMp.id IS NOT NULL THEN 'yes' ELSE 'no' END) AS IsOldDoc
+                SELECT Doc.SystemFileName, MAX(Doc.CreatedDateTime) AS UpdateDate
                 FROM ProviderTariffDocs Doc WITH(NOLOCK)
                 INNER JOIN ProviderTariff_Map Mp WITH(NOLOCK) ON Doc.Id = Mp.DocumentId
-                LEFT JOIN (SELECT documentid, id FROM ProviderTariff_Map WITH(NOLOCK) WHERE MOUID = 0) OMp
-                       ON Doc.Id = OMp.documentid
                 WHERE Mp.ProviderID = @ProviderID
                   AND Doc.Status = 1
                   AND Mp.Status  = 1
-                  AND Doc.FileName LIKE '%.pdf'
+                  AND (Doc.SystemFileName LIKE '%.pdf' OR Doc.SystemFileName LIKE '%.zip')
                   " + mouFilter + @"
-                GROUP BY Doc.Id, Doc.SystemFileName, Doc.FileName
+                GROUP BY Doc.SystemFileName
                 ORDER BY MAX(Doc.CreatedDateTime) DESC";
 
             cmd.Parameters.AddWithValue("@ProviderID", providerId);
@@ -187,13 +189,11 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                     string sysFileName = rdr["SystemFileName"]?.ToString();
                     if (string.IsNullOrWhiteSpace(sysFileName)) continue;
 
-                    string isOldDoc = rdr["IsOldDoc"]?.ToString().ToLower() ?? "no";
-
                     DateTime updateDate = rdr.IsDBNull(rdr.GetOrdinal("UpdateDate"))
                         ? DateTime.MinValue
                         : Convert.ToDateTime(rdr["UpdateDate"]);
 
-                    tariffFiles.Add(System.Tuple.Create(sysFileName, updateDate, isOldDoc, sysFileName));
+                    tariffFiles.Add(System.Tuple.Create(sysFileName, updateDate));
                 }
             }
         }
@@ -205,22 +205,15 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
-        // Download each tariff PDF with a REGION-ONLY S3 client (authenticates via the
-        // instance IAM role — same as the working "Tariff Documents" screen) and a
-        // SYNCHRONOUS GetObject. This stays fully synchronous, exactly like the original
-        // (GetPreSignedURL + WebClient were both sync) — no async-over-sync blocking.
-        //
-        // Root cause this fixes: the old code built `new BasicAWSCredentials(accessKey,
-        // secretKey)` from ProviderDocaccesskey/ProviderDocsecretkey. Those config keys
-        // are unused by the rest of the app (which relies on the IAM role) and were
-        // empty/stale, so every presigned-URL download failed and the silent
-        // `catch { /* skip failed */ }` left s3TariffCandidates empty.
-        //
-        // Per-file failures are now logged to Elmah with the real S3 error so a recurring
-        // failure can be diagnosed (NoSuchKey = key path, AccessDenied = role permission).
-        // Key layout is unchanged:
-        //   not-old : {providerId}/{ProviderTariffDocumentPath}{SystemFileName}
-        //   old     : {ProviderTariffDocumentPathWebShare}{SystemFileName}
+        // Download each tariff object with a region-only S3 client (IAM-role auth, same
+        // as the working screen) using synchronous GetObject (keeps this action sync).
+        // For each SystemFileName we PROBE the two possible locations, first hit wins:
+        //    1. {providerId}/{ProviderTariffDocumentPath}{SystemFileName}   (normal)
+        //    2. {ProviderTariffDocumentPathWebShare}{SystemFileName}        (legacy flat)
+        // This removes any dependence on an isOldDoc flag. Tariffs are usually ZIPs, so
+        // a downloaded .zip is expanded via CollectTariffFilesFromZip (exactly like the
+        // local-zip branch); non-zip objects are added as-is. Either way the candidates
+        // feed PickTariffFileWithAI. Real S3 errors are logged to Elmah per object.
         var s3TariffCandidates = new System.Collections.Generic.List<System.Tuple<string, DateTime, byte[]>>();
 
         using (var s3Client = new Amazon.S3.AmazonS3Client(Amazon.RegionEndpoint.APSouth1))
@@ -229,31 +222,64 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             {
                 string sysName = tf.Item1;
                 DateTime modDate = tf.Item2;
-                string isOldDoc = tf.Item3;
-                string s3Key = isOldDoc == "yes"
-                    ? webShare2 + sysName
-                    : providerId.ToString() + "/" + docPath + sysName;
-                try
+                if (string.IsNullOrWhiteSpace(sysName)) continue;
+
+                string[] candidateKeys = new[]
                 {
-                    var getReq = new Amazon.S3.Model.GetObjectRequest
+                    providerId.ToString() + "/" + docPath + sysName,
+                    webShare2 + sysName
+                };
+
+                byte[] objBytes = null;
+                foreach (var key in candidateKeys)
+                {
+                    try
                     {
-                        BucketName = s3Bucket,
-                        Key = s3Key
-                    };
-                    using (var getResp = s3Client.GetObject(getReq))
-                    using (var ms = new System.IO.MemoryStream())
+                        var getReq = new Amazon.S3.Model.GetObjectRequest { BucketName = s3Bucket, Key = key };
+                        using (var getResp = s3Client.GetObject(getReq))
+                        using (var ms = new System.IO.MemoryStream())
+                        {
+                            getResp.ResponseStream.CopyTo(ms);
+                            objBytes = ms.ToArray();
+                        }
+                        if (objBytes != null && objBytes.Length > 0) break; // got it
+                    }
+                    catch (Amazon.S3.AmazonS3Exception s3ex)
                     {
-                        getResp.ResponseStream.CopyTo(ms);
-                        byte[] pdfBytes = ms.ToArray();
-                        if (pdfBytes.Length > 0)
-                            s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, pdfBytes));
+                        // NoSuchKey / 404 -> wrong location, try the next candidate key.
+                        if (s3ex.ErrorCode == "NoSuchKey" || (int)s3ex.StatusCode == 404)
+                            continue;
+                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
+                                          " Key=" + key + " — " + s3ex.Message, s3ex)));
+                    }
+                    catch (Exception s3ex)
+                    {
+                        Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
+                            new Exception("Tariff S3 GetObject error. Bucket=" + s3Bucket +
+                                          " Key=" + key + " — " + s3ex.Message, s3ex)));
                     }
                 }
-                catch (Exception s3ex)
+
+                if (objBytes == null || objBytes.Length == 0)
                 {
                     Elmah.ErrorLog.GetDefault(null).Log(new Elmah.Error(
-                        new Exception("Tariff S3 GetObject failed. Bucket=" + s3Bucket +
-                                      " Key=" + s3Key + " — " + s3ex.Message, s3ex)));
+                        new Exception("Tariff S3: no object found for SystemFileName=" + sysName +
+                                      " (tried: " + string.Join("  |  ", candidateKeys) + ")")));
+                    continue;
+                }
+
+                if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Expand the zip into individual tariff files, same as the local branch.
+                    using (var zipStream = new System.IO.MemoryStream(objBytes))
+                    {
+                        CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
+                    }
+                }
+                else
+                {
+                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
                 }
             }
         }
