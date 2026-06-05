@@ -63,6 +63,14 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                 CollectTariffFilesFromZip(rootStream, "", allTariffCandidates);
             }
 
+            // A "discount" sheet is not a tariff — never let it become a selection
+            // candidate (so neither the AI nor the rule-based fallback can pick it).
+            int beforeDiscFilter = allTariffCandidates.Count;
+            allTariffCandidates.RemoveAll(f => f.Item1 != null &&
+                f.Item1.IndexOf("discount", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (allTariffCandidates.Count != beforeDiscFilter)
+                TariffLog("[Tariff] Excluded " + (beforeDiscFilter - allTariffCandidates.Count) + " discount file(s) — not tariffs.");
+
             byte[] tariffBytes = null;
 
             TariffLog("[Tariff] STEP 1 — Zip scanned recursively. Total tariff files=" + allTariffCandidates.Count);
@@ -154,7 +162,7 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
         // by PickTariffFileWithAI from the filenames, not by this query. Each doc's REAL
         // S3 key is resolved per-doc below from Usp_TariffUploadDoc_FillDetails — the same
         // source the working "Tariff Documents" screen uses.
-        var tariffDocs = new System.Collections.Generic.List<System.Tuple<long, DateTime>>();
+        var tariffDocs = new System.Collections.Generic.List<System.Tuple<long, string, DateTime>>();
         using (var conn = new System.Data.SqlClient.SqlConnection(connStr))
         {
             conn.Open();
@@ -162,14 +170,14 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             cmd.CommandType = System.Data.CommandType.Text;
 
             cmd.CommandText = @"
-                SELECT Doc.Id AS DocId, MAX(Doc.CreatedDateTime) AS UpdateDate
+                SELECT Doc.Id AS DocId, Doc.FileName AS DisplayName, MAX(Doc.CreatedDateTime) AS UpdateDate
                 FROM ProviderTariffDocs Doc WITH(NOLOCK)
                 INNER JOIN ProviderTariff_Map Mp WITH(NOLOCK) ON Doc.Id = Mp.DocumentId
                 WHERE Mp.ProviderID = @ProviderID
                   AND Doc.Status = 1
                   AND Mp.Status  = 1
                   AND (Doc.SystemFileName LIKE '%.pdf' OR Doc.SystemFileName LIKE '%.zip')
-                GROUP BY Doc.Id
+                GROUP BY Doc.Id, Doc.FileName
                 ORDER BY MAX(Doc.CreatedDateTime) DESC";
 
             cmd.Parameters.AddWithValue("@ProviderID", providerId);
@@ -180,12 +188,13 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                 {
                     if (rdr.IsDBNull(rdr.GetOrdinal("DocId"))) continue;
                     long docId = Convert.ToInt64(rdr["DocId"]);
+                    string displayName = rdr["DisplayName"]?.ToString() ?? "";
 
                     DateTime updateDate = rdr.IsDBNull(rdr.GetOrdinal("UpdateDate"))
                         ? DateTime.MinValue
                         : Convert.ToDateTime(rdr["UpdateDate"]);
 
-                    tariffDocs.Add(System.Tuple.Create(docId, updateDate));
+                    tariffDocs.Add(System.Tuple.Create(docId, displayName, updateDate));
                 }
             }
         }
@@ -219,7 +228,8 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             foreach (var td in tariffDocs)
             {
                 long docId = td.Item1;
-                DateTime modDate = td.Item2;
+                string displayName = td.Item2;
+                DateTime modDate = td.Item3;
 
                 string ownerProviderId = null;
                 string sysName = null;
@@ -310,20 +320,44 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
                     continue;
                 }
 
+                // Carry this doc's display FileName (the one with the insurer/hospital/
+                // dates, e.g. "...HDFC Ergo (20-SEP-2025)") onto its candidate(s), so the
+                // AI selector gets the same meaningful "folder_file" context the local
+                // branch gets from inner-zip names — and so files with the same inner name
+                // across different tariffs don't collide. Fall back to SystemFileName if
+                // the display name is missing.
+                string ctx = !string.IsNullOrWhiteSpace(displayName) ? displayName : sysName;
+                if (ctx.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    ctx = ctx.Substring(0, ctx.Length - 4);
+
                 if (sysName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Expand the zip into individual tariff files, same as the local branch.
+                    // Expand the zip, then prefix each just-extracted file with ctx
+                    // (independent of CollectTariffFilesFromZip's own prefix handling).
+                    int beforeExpand = s3TariffCandidates.Count;
                     using (var zipStream = new System.IO.MemoryStream(objBytes))
                     {
                         CollectTariffFilesFromZip(zipStream, "", s3TariffCandidates);
                     }
+                    for (int i = beforeExpand; i < s3TariffCandidates.Count; i++)
+                    {
+                        var ex = s3TariffCandidates[i];
+                        s3TariffCandidates[i] = System.Tuple.Create(ctx + "_" + ex.Item1, ex.Item2, ex.Item3);
+                    }
                 }
                 else
                 {
-                    s3TariffCandidates.Add(System.Tuple.Create(sysName, modDate, objBytes));
+                    // Direct file (not a zip): use the display FileName as the candidate name.
+                    string directName = !string.IsNullOrWhiteSpace(displayName) ? displayName : sysName;
+                    s3TariffCandidates.Add(System.Tuple.Create(directName, modDate, objBytes));
                 }
             }
         }
+
+        // A "discount" sheet is not a tariff — drop any such file (including files
+        // expanded out of a zip) so it can't be selected by AI or the rule fallback.
+        s3TariffCandidates.RemoveAll(f => f.Item1 != null &&
+            f.Item1.IndexOf("discount", StringComparison.OrdinalIgnoreCase) >= 0);
 
         if (s3TariffCandidates.Count == 0)
         {
@@ -332,9 +366,18 @@ public ActionResult GetTariffDocument(string claimId = null, string slNo = null)
             return Json(res, JsonRequestBehavior.AllowGet);
         }
 
+        // Log the full candidate names (including the FileName prefix carried onto zip
+        // contents) — same visibility the local branch gives via STEP 2 / STEP 4.
+        TariffLog("[Tariff] STEP 1 (S3) — Files downloaded=" + s3TariffCandidates.Count
+                  + " InsurerCode=" + insurerCode + " IsPSU=" + isPsu + " ProviderID=" + providerId);
+        TariffLog("[Tariff] STEP 2 (S3) — All candidate file names collected (" + s3TariffCandidates.Count + "): "
+                  + string.Join(" | ", s3TariffCandidates.ConvertAll(f => f.Item1 + " [" + f.Item2.ToString("yyyy-MM-dd") + "]")));
+        TariffLog("[Tariff] STEP 3 (S3) — Sending to AI for selection...");
+
         var bestTariffResult = PickTariffFileWithAI(s3TariffCandidates, isPsu, insurerCode);
         byte[] bestTariff = bestTariffResult?.Item2;
         string bestTariffName = bestTariffResult?.Item1 ?? (providerId + "-tariff.pdf");
+        TariffLog("[Tariff] STEP 4 (S3) — AI selected: " + (bestTariffResult?.Item1 ?? "null"));
         res.Success = true;
         res.Message = "Tariff loaded from S3. IsPSU=" + isPsu + " InsurerCode=" + insurerCode + " Files=" + s3TariffCandidates.Count
                     + " || TARIFF SELECTION: " + _lastTariffSelectionLog;
