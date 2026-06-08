@@ -7217,13 +7217,18 @@
                 });
             }
 
-            if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
-                // STAGING — Step 6: if this claim was pre-processed by the staging
-                // pipeline (ProcessingStatus='done' with a jobId), render the AI
-                // summary instantly from that stored jobId instead of running the
-                // on-demand InitAiSummary flow. Falls back to InitAiSummary if there
-                // is no pre-processed result.
-                LoadAiSummaryFromStagingOrInit(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+            // AI Summary is shown only for adjudication-stage claims (StageID = 5).
+            if (($('#hdnClaimStageID').val() || '').toString().trim() === '5') {
+                if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
+                    // STAGING — Step 6: if this claim was pre-processed by the staging
+                    // pipeline (ProcessingStatus='done' with a jobId), render the AI
+                    // summary instantly from that stored jobId instead of running the
+                    // on-demand InitAiSummary flow. Falls back to InitAiSummary if there
+                    // is no pre-processed result.
+                    LoadAiSummaryFromStagingOrInit(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+                }
+            } else {
+                $('#divAiSummary').hide();
             }
 
 
@@ -7355,9 +7360,14 @@
          * ═══════════════════════════════════════════════════════════════════
          */
         function InitAiSummary(claimID, slNo) {
+            // AI Summary is shown only for adjudication-stage claims (StageID = 5).
+            if (($('#hdnClaimStageID').val() || '').toString().trim() !== '5') {
+                $('#divAiSummary').hide();
+                return;
+            }
             // Check Claimsdetails directly before starting
             $.ajax({
-                url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
+                url: '/MedicalScrutiny/IsClaimAISummaryAllowed',
                 type: 'GET',
                 data: { claimId: claimID, slNo: slNo },
                 success: function(res) {
