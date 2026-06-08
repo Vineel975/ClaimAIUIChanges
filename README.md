@@ -1,37 +1,38 @@
-# Show AI Summary only for adjudication-stage claims (StageID = 4)
+# AI Summary → only for adjudication-stage claims (StageID = 4)
 
-**File:** `Enrollment/Views/MedicalScrutiny/Index.cshtml` (Spectra)
-**Why here:** The AI Summary widget (`#divAiSummary`) and its iframe live in this view, and
-the claim's stage is already on the page as `#hdnClaimStageID` (= `ViewData["ClaimStageID"]`).
-ClaimAI (the iframe) does not load the *current* claim's stage, so gating there would still
-leave Spectra showing the empty widget shell — the gate belongs in Spectra.
+**File:** `Enrollment/Views/MedicalScrutiny/Index.cshtml`
 
-Apply by **anchor** (line numbers will differ from your deployed file). Two small inserts.
+Two find-and-replace edits in the `<script>` block. Both gate on `#hdnClaimStageID`
+(which already holds `@ViewData["ClaimStageID"]`). Edit 1 covers normal page load;
+Edit 2 covers the Reload button (and any other call into `InitAiSummary`).
 
 ---
 
-## Edit 1 — page-load entry (`$(document).ready`)
+## EDIT 1 — page-load entry (inside the first `$(document).ready`)
 
-Find this block (inside the `$(document).ready(function () { ... })` that has
-`GetInsurerRejectionMaster(...)` and `var _claimIdOnLoad = $('#hdnClaimID').val();`):
-
+### FIND
 ```js
-            var _claimIdOnLoad = $('#hdnClaimID').val();
-
             if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
-                InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+                // STAGING — Step 6: if this claim was pre-processed by the staging
+                // pipeline (ProcessingStatus='done' with a jobId), render the AI
+                // summary instantly from that stored jobId instead of running the
+                // on-demand InitAiSummary flow. Falls back to InitAiSummary if there
+                // is no pre-processed result.
+                LoadAiSummaryFromStagingOrInit(_claimIdOnLoad, $('#hdnClaimSlNo').val());
             }
 ```
 
-Replace with:
-
+### REPLACE WITH
 ```js
-            var _claimIdOnLoad = $('#hdnClaimID').val();
-
             // AI Summary is shown only for adjudication-stage claims (StageID = 4).
             if (($('#hdnClaimStageID').val() || '').toString().trim() === '4') {
                 if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
-                    InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+                    // STAGING — Step 6: if this claim was pre-processed by the staging
+                    // pipeline (ProcessingStatus='done' with a jobId), render the AI
+                    // summary instantly from that stored jobId instead of running the
+                    // on-demand InitAiSummary flow. Falls back to InitAiSummary if there
+                    // is no pre-processed result.
+                    LoadAiSummaryFromStagingOrInit(_claimIdOnLoad, $('#hdnClaimSlNo').val());
                 }
             } else {
                 $('#divAiSummary').hide();
@@ -40,17 +41,17 @@ Replace with:
 
 ---
 
-## Edit 2 — guard the init itself (covers the Reload button → `ReloadAiSummary` → `InitAiSummary`)
+## EDIT 2 — guard `InitAiSummary` (covers the Reload button → `ReloadAiSummary`)
 
-Find:
-
+### FIND
 ```js
         function InitAiSummary(claimID, slNo) {
-            console.log('[ClaimAI] STEP 1 START: InitAiSummary. claimID:', claimID, 'slNo:', slNo, 'ClaimAI URL:', _claimAiUrl);
+            // Check Claimsdetails directly before starting
+            $.ajax({
+                url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
 ```
 
-Insert the guard as the first lines of the function body:
-
+### REPLACE WITH
 ```js
         function InitAiSummary(claimID, slNo) {
             // AI Summary is shown only for adjudication-stage claims (StageID = 4).
@@ -58,33 +59,39 @@ Insert the guard as the first lines of the function body:
                 $('#divAiSummary').hide();
                 return;
             }
-            console.log('[ClaimAI] STEP 1 START: InitAiSummary. claimID:', claimID, 'slNo:', slNo, 'ClaimAI URL:', _claimAiUrl);
+            // Check Claimsdetails directly before starting
+            $.ajax({
+                url:  '/MedicalScrutiny/IsClaimAISummaryAllowed',
 ```
 
 ---
 
 ## Result
-- **Stage 4 (adjudication):** widget renders and loads exactly as today (page load + Reload work).
-- **Any other stage:** `#divAiSummary` is hidden and no documents/Convex/iframe work runs —
-  nothing fires off in the background.
+- **StageID = 4 (adjudication):** unchanged — page load + Reload work exactly as today
+  (staging pre-load, restore-after-save, on-demand init, claim-type/cataract gate, etc.).
+- **Any other stage:** `#divAiSummary` is hidden and none of the PDF-load / Convex /
+  iframe work starts. `LoadAiSummaryFromStagingOrInit`, `RestoreAiSummaryIfSaved` and
+  `InitAiSummary` are all skipped.
 
-## Optional (also stop the markup from rendering at all)
-If you'd rather the widget HTML never reach the page for non-stage-4 claims, also wrap the
-`#divAiSummary` block (`<!-- AI Summary -->` … `<!-- END AI Summary -->`) in:
+## Notes
+- These two edits are enough on their own. They don't touch the existing
+  `IsClaimAISummaryAllowed` / cataract-maternity restrictions — those still apply on top
+  for stage-4 claims.
+- This is a string comparison against `'4'`; confirm StageID 4 = Adjudication in your
+  `Claimstage` table (this view already gates other things on `ViewData["ClaimStageID"]`,
+  so the value source is correct).
+- After editing: build in Visual Studio and recycle the app pool.
+
+### Optional — also stop the markup from rendering for non-stage-4
+If you'd rather the widget HTML never reach the page, you can additionally wrap the
+`#divAiSummary` block (from `<!-- AI Summary ... -->` to `<!-- END AI Summary -->`) in:
 
 ```cshtml
 @if (Convert.ToString(ViewData["ClaimStageID"]) == "4")
 {
-    <!-- AI Summary ... entire #divAiSummary block ... END AI Summary -->
+    <!-- the entire #divAiSummary widget -->
 }
 ```
 
-The JS guards above are still recommended even with this wrap, so the Reload path and any
-restore-after-save path stay correct. The JS guard alone is sufficient and lower-risk; the
-Razor wrap is just belt-and-suspenders.
-
-## Verify before deploy
-- Confirm **StageID 4 = Adjudication** in your `Claimstage` table (you stated it is). This view
-  already uses stage-based gating elsewhere — e.g. an `@if` on `ViewData["ClaimStageID"]` for
-  stages 5 / 24 — so the same `ClaimStageID` value is the right thing to compare.
-- Build in Visual Studio and recycle the app pool as usual.
+The two JS guards above are still recommended even with this wrap (Reload + restore paths).
+The JS guards alone are sufficient and lower-risk; the Razor wrap is optional.
