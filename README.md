@@ -1,33 +1,90 @@
-Id                   FileName                                                                                                                                                                                                                                                         SystemFileName                                                                                                                                                                                                                                                   Status CreatedDateTime
--------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ------ -----------------------
-58222                2565-Fortis Hospitals  Noida  UP only for HDFC Ergo (20-SEP-2025).zip                                                                                                                                                                                            2565_Fortis_Hospitals_Ltd__Noida_12_06_2018_31_12_2030_134057742201543556.zip                                                                                                                                                                                    1      2025-10-24 15:40:21.547
-57782                2565-Fortis Hospitals Ltd, Noida UP ONLY FOR MAGMA (15-SEP-2025).xlsx                                                                                                                                                                                            2565_Fortis_Hospitals_Ltd__Noida_12_06_2018_31_12_2030_134031640269584105.xlsx                                                                                                                                                                                   1      2025-09-24 10:37:07.150
-14335                2565-Fortis Hospitals Ltd, Noida UP ONLY FOR GIPSA (01-OCT-2024).zip                                                                                                                                                                                             2565-Fortis Hospitals Ltd, Noida UP ONLY FOR GIPSA (01-OCT-2024).zip                                                                                                                                                                                             1      2024-10-10 09:56:00.000
-14336                2565-Fortis Hospitals Ltd, Noida UP ONLY FOR GIPSA (14-Sep-2024).zip                                                                                                                                                                                             2565-Fortis Hospitals Ltd, Noida UP ONLY FOR GIPSA (14-Sep-2024).zip                                                                                                                                                                                             1      2024-09-13 09:53:24.000
-14337                2565-Fortis Hospitals Ltd, Noida UP Only for Private insurers (01-NOV-2023).pdf                                                                                                                                                                                  2565-Fortis Hospitals Ltd, Noida UP Only for Private insurers (01-NOV-2023).pdf                                                                                                                                                                                  1      2023-11-01 10:46:13.000
-14337                2565-Fortis Hospitals Ltd, Noida UP Only for Private insurers (01-NOV-2023).pdf                                                                                                                                                                                  2565-Fortis Hospitals Ltd, Noida UP Only for Private insurers (01-NOV-2023).pdf                                                                                                                                                                                  1      2023-11-01 10:46:13.000
-14334                2565-Fortis Hospitals Ltd Noida UP Only for HDFC Ergo (06-OCT-2023).pdf                                                                                                                                                                                          2565-Fortis Hospitals Ltd Noida UP Only for HDFC Ergo (06-OCT-2023).pdf                                                                                                                                                                                          1      2023-10-06 11:42:34.000
-14327                2565- Fortis Hospitals Ltd, Noida UP Only for Kotak Mahindra General Insurance (01-June-2023).zip                                                                                                                                                                2565- Fortis Hospitals Ltd, Noida UP Only for Kotak Mahindra General Insurance (01-June-2023).zip                                                                                                                                                                1      2023-05-29 11:22:41.000
-14326                2565 -International Hospital Limited (Fortis Hospital) Noida UP GIPSA ( 05 -Nov -2021).zip                                                                                                                                                                       2565 -International Hospital Limited (Fortis Hospital) Noida UP GIPSA ( 05 -Nov -2021).zip                                                                                                                                                                       1      2021-11-06 10:51:11.000
-14331                2565-Fortis Hospital Noida UP SOC For Private Insurers ( 10-Sep-2020).zip                                                                                                                                                                                        2565-Fortis Hospital Noida UP SOC For Private Insurers ( 10-Sep-2020).zip                                                                                                                                                                                        1      2020-09-10 18:28:25.000
-14331                2565-Fortis Hospital Noida UP SOC For Private Insurers ( 10-Sep-2020).zip                                                                                                                                                                                        2565-Fortis Hospital Noida UP SOC For Private Insurers ( 10-Sep-2020).zip                                                                                                                                                                                        1      2020-09-10 18:28:25.000
-14328                2565-Fortis Hospital Noida UP (19-Mar-2019) Only for Chola MS Insurer.pdf                                                                                                                                                                                        2565-Fortis Hospital Noida UP (19-Mar-2019) Only for Chola MS Insurer.pdf                                                                                                                                                                                        1      2019-03-19 15:56:59.000
-14329                2565-Fortis Hospital Noida UP Only for ABHI (28-Feb-2019).pdf                                                                                                                                                                                                    2565-Fortis Hospital Noida UP Only for ABHI (28-Feb-2019).pdf                                                                                                                                                                                                    1      2019-02-28 11:25:20.000
-14329                2565-Fortis Hospital Noida UP Only for ABHI (28-Feb-2019).pdf                                                                                                                                                                                                    2565-Fortis Hospital Noida UP Only for ABHI (28-Feb-2019).pdf                                                                                                                                                                                                    1      2019-02-28 11:25:20.000
-14330                2565-Fortis Hospital Noida UP SOC For Private Insurers ( 06-Oct-2018).pdf                                                                                                                                                                                        2565-Fortis Hospital Noida UP SOC For Private Insurers ( 06-Oct-2018).pdf                                                                                                                                                                                        1      2018-10-06 10:43:40.000
-14342                2565-International Hospital Limited (Fortis Hospital) Noida UP GIPSA Room Rent ( 05-Dec-2017).zip                                                                                                                                                                2565-International Hospital Limited (Fortis Hospital) Noida UP GIPSA Room Rent ( 05-Dec-2017).zip                                                                                                                                                                1      2017-12-05 16:19:35.000
-14344                2565-International Hospital Limited (Fortis Hospital) Noida UP SOC ( 28-Nov-2017).pdf                                                                                                                                                                            2565-International Hospital Limited (Fortis Hospital) Noida UP SOC ( 28-Nov-2017).pdf                                                                                                                                                                            1      2017-11-28 15:13:46.000
-14341                2565-International Hospital Limited (Fortis Hospital) Noida UP GIPSA ( 06-Jan-2017 ).pdf                                                                                                                                                                         2565-International Hospital Limited (Fortis Hospital) Noida UP GIPSA ( 06-Jan-2017 ).pdf                                                                                                                                                                         1      2017-01-06 10:51:43.000
-14339                2565-International Hospital Limited (Fortis Hospital) Gipsa ( 13-Nov-2015 ).xls                                                                                                                                                                                  2565-International Hospital Limited (Fortis Hospital) Gipsa ( 13-Nov-2015 ).xls                                                                                                                                                                                  1      2015-11-13 16:02:55.000
-14332                2565-Fortis Hospitals Ltd Noida (Addition of a procedure in GIPSA) (31-Aug-2015).zip                                                                                                                                                                             2565-Fortis Hospitals Ltd Noida (Addition of a procedure in GIPSA) (31-Aug-2015).zip                                                                                                                                                                             1      2015-08-31 12:39:43.000
-14333                2565-Fortis Hospitals Ltd Noida UP (14-June-2014).pdf                                                                                                                                                                                                            2565-Fortis Hospitals Ltd Noida UP (14-June-2014).pdf                                                                                                                                                                                                            1      2014-06-14 16:37:49.000
-14340                2565-International Hospital Limited (Fortis Hospital) Noida UP (23-May-2013).zip                                                                                                                                                                                 2565-International Hospital Limited (Fortis Hospital) Noida UP (23-May-2013).zip                                                                                                                                                                                 1      2013-05-23 15:15:14.000
-14345                2565-International Hospital Limited Fortis Hospital Noida UP (03-Apr-2013).pdf                                                                                                                                                                                   2565-International Hospital Limited Fortis Hospital Noida UP (03-Apr-2013).pdf                                                                                                                                                                                   1      2013-04-03 11:18:59.000
-14338                2565-International Hospital Limited (Fortis Hospital)  Noida UP (12-Dec-2012).zip                                                                                                                                                                                2565-International Hospital Limited (Fortis Hospital)  Noida UP (12-Dec-2012).zip                                                                                                                                                                                1      2012-12-12 16:03:06.000
-14346                2565-International Hospital Limited-Gipsa-(25-Mar-2011) ..pdf                                                                                                                                                                                                    2565-International Hospital Limited-Gipsa-(25-Mar-2011) ..pdf                                                                                                                                                                                                    1      2011-03-26 10:11:06.000
-14325                2565 - Fortis H-Gautam Buddhnagar(13-Sep-2006).pdf                                                                                                                                                                                                               2565 - Fortis H-Gautam Buddhnagar(13-Sep-2006).pdf                                                                                                                                                                                                               1      2000-01-01 00:00:00.000
+# Show AI Summary only for adjudication-stage claims (StageID = 4)
 
-(26 rows affected)
+**File:** `Enrollment/Views/MedicalScrutiny/Index.cshtml` (Spectra)
+**Why here:** The AI Summary widget (`#divAiSummary`) and its iframe live in this view, and
+the claim's stage is already on the page as `#hdnClaimStageID` (= `ViewData["ClaimStageID"]`).
+ClaimAI (the iframe) does not load the *current* claim's stage, so gating there would still
+leave Spectra showing the empty widget shell — the gate belongs in Spectra.
 
+Apply by **anchor** (line numbers will differ from your deployed file). Two small inserts.
 
-Completion time: 2026-06-04T18:53:15.3421004+05:30
+---
+
+## Edit 1 — page-load entry (`$(document).ready`)
+
+Find this block (inside the `$(document).ready(function () { ... })` that has
+`GetInsurerRejectionMaster(...)` and `var _claimIdOnLoad = $('#hdnClaimID').val();`):
+
+```js
+            var _claimIdOnLoad = $('#hdnClaimID').val();
+
+            if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
+                InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+            }
+```
+
+Replace with:
+
+```js
+            var _claimIdOnLoad = $('#hdnClaimID').val();
+
+            // AI Summary is shown only for adjudication-stage claims (StageID = 4).
+            if (($('#hdnClaimStageID').val() || '').toString().trim() === '4') {
+                if (!RestoreAiSummaryIfSaved(_claimIdOnLoad)) {
+                    InitAiSummary(_claimIdOnLoad, $('#hdnClaimSlNo').val());
+                }
+            } else {
+                $('#divAiSummary').hide();
+            }
+```
+
+---
+
+## Edit 2 — guard the init itself (covers the Reload button → `ReloadAiSummary` → `InitAiSummary`)
+
+Find:
+
+```js
+        function InitAiSummary(claimID, slNo) {
+            console.log('[ClaimAI] STEP 1 START: InitAiSummary. claimID:', claimID, 'slNo:', slNo, 'ClaimAI URL:', _claimAiUrl);
+```
+
+Insert the guard as the first lines of the function body:
+
+```js
+        function InitAiSummary(claimID, slNo) {
+            // AI Summary is shown only for adjudication-stage claims (StageID = 4).
+            if (($('#hdnClaimStageID').val() || '').toString().trim() !== '4') {
+                $('#divAiSummary').hide();
+                return;
+            }
+            console.log('[ClaimAI] STEP 1 START: InitAiSummary. claimID:', claimID, 'slNo:', slNo, 'ClaimAI URL:', _claimAiUrl);
+```
+
+---
+
+## Result
+- **Stage 4 (adjudication):** widget renders and loads exactly as today (page load + Reload work).
+- **Any other stage:** `#divAiSummary` is hidden and no documents/Convex/iframe work runs —
+  nothing fires off in the background.
+
+## Optional (also stop the markup from rendering at all)
+If you'd rather the widget HTML never reach the page for non-stage-4 claims, also wrap the
+`#divAiSummary` block (`<!-- AI Summary -->` … `<!-- END AI Summary -->`) in:
+
+```cshtml
+@if (Convert.ToString(ViewData["ClaimStageID"]) == "4")
+{
+    <!-- AI Summary ... entire #divAiSummary block ... END AI Summary -->
+}
+```
+
+The JS guards above are still recommended even with this wrap, so the Reload path and any
+restore-after-save path stay correct. The JS guard alone is sufficient and lower-risk; the
+Razor wrap is just belt-and-suspenders.
+
+## Verify before deploy
+- Confirm **StageID 4 = Adjudication** in your `Claimstage` table (you stated it is). This view
+  already uses stage-based gating elsewhere — e.g. an `@if` on `ViewData["ClaimStageID"]` for
+  stages 5 / 24 — so the same `ClaimStageID` value is the right thing to compare.
+- Build in Visual Studio and recycle the app pool as usual.
