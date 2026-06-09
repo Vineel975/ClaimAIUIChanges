@@ -51,3 +51,24 @@ EXEC USP_ClaimMedicalScrutiny_retrieve @ClaimID = 26060843162, @Slno = <slno>;
 Step 5 (only if you're testing the staging worker) — reset so it re-picks the claim
 DELETE FROM dbo.ClaimAI_Results WHERE ClaimID = 26060843162;
 UPDATE Claims SET StageID = 52 WHERE ID = 26060843162;
+
+
+
+-- the claim's member policy
+DECLARE @MemberPolicyID BIGINT = (SELECT MemberPolicyID FROM Claims WHERE ID = <claimId>);
+
+-- 1. which BPSIID the fallback will use (it takes the TOP 1 by ID DESC)
+SELECT ID, MemberPolicyID, BPSIID, SICategoryID_P20, Deleted
+FROM MemberSI WITH(NOLOCK)
+WHERE MemberPolicyID = @MemberPolicyID AND ISNULL(Deleted,0)=0
+ORDER BY ID DESC;
+
+-- 2. every ailment condition on this member's BPSIs — see where 35,000 actually lives
+SELECT bsc.*, c.Name AS ConditionName, par.Name AS ParentName
+FROM BPSIConditions bsc WITH(NOLOCK)
+LEFT JOIN Mst_BPConditions c   WITH(NOLOCK) ON c.ID   = bsc.BPConditionID
+LEFT JOIN Mst_BPConditions par WITH(NOLOCK) ON par.ID = c.ParentID
+WHERE bsc.BPSIID IN (SELECT BPSIID FROM MemberSI WITH(NOLOCK)
+                     WHERE MemberPolicyID = @MemberPolicyID AND ISNULL(Deleted,0)=0)
+  AND ISNULL(bsc.Deleted,0) = 0
+ORDER BY bsc.BPSIID;
