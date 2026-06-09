@@ -1,2 +1,7 @@
-[ClaimAI] Fill_HospDtls: ReqFacilityID= 12 ApprovedFacilityID= 2 IsAprvFacilitychanged= true StageID= 5 ServiceTypeID= 1 RequestTypeID= 1
-ClaimsCommonUtils.js?v=2.3:1117 [ClaimAI] ddlApprovedFacility set to: 195 actual val after set: 195
+// ClaimAI: restore the Approved Accommodation actually saved in the DB.
+    // The saved value is already correct per claim type (Day-care 195 for a
+    // cataract default, the availed/manual room otherwise). Fall back to
+    // Day-care only if the DB has no value.
+    var _aprvFacVal = (data[0].ApprovedFacilityID != null && data[0].ApprovedFacilityID != 0)
+        ? data[0].ApprovedFacilityID
+        : 195;
