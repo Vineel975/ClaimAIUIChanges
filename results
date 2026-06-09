@@ -1,16 +1,6 @@
-DECLARE @BPSIID BIGINT = 901071;        -- this member's BPSIID
-DECLARE @ProcedureID VARCHAR(20) = '503';  -- the claim's coded TPAProcedureID
-SELECT TOP 1
-    COALESCE(bsc.ClaimLimit, bsc.IndividualLimit, bsc.FamilyLimit, bsc.PolicyLimit) AS LimitAmt,
-    c.Name AS ConditionName, bsc.Remarks
-FROM BPSIConditions bsc WITH(NOLOCK)
-LEFT JOIN Mst_BPConditions c   WITH(NOLOCK) ON c.ID   = bsc.BPConditionID
-LEFT JOIN Mst_BPConditions par WITH(NOLOCK) ON par.ID = c.ParentID
-WHERE bsc.BPSIID = @BPSIID
-  AND ISNULL(bsc.Deleted,0) = 0
-  AND par.Name = 'Ailment Conditions'
-  AND ISNULL(bsc.isCovered,0) = 1
-  AND COALESCE(bsc.ClaimLimit, bsc.IndividualLimit, bsc.FamilyLimit, bsc.PolicyLimit) IS NOT NULL
-  AND EXISTS (SELECT 1 FROM fn_Split(bsc.TPAProcedureID, ',') WHERE LTRIM(RTRIM(Stringvalue)) = @ProcedureID)
-ORDER BY COALESCE(bsc.ClaimLimit, bsc.IndividualLimit, bsc.FamilyLimit, bsc.PolicyLimit) ASC;
--- expect: LimitAmt = 35000.00, ConditionName = 'Ailment Cappings'
+[ClaimAI] postMessage received: setApprovedAccommodation {"source":"claimai","type":"setApprovedAccommodation","facilityId":"2","claimType":"cataract"}
+Index:16898 [ClaimAI] setApprovedAccommodation: applying approved value: 2
+Index:16891 [ClaimAI] postMessage received: setApprovedAccommodation {"source":"claimai","type":"setApprovedAccommodation","facilityId":"2","claimType":"cataract"}
+Index:16898 [ClaimAI] setApprovedAccommodation: applying approved value: 2
+Index:17331 [ClaimAI Metrics] Field changed — Approved Accommodation: "195" → "2"
+Index:17402 [ClaimAI] Approved Accommodation set from iframe: 195
