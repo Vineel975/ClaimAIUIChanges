@@ -1,4 +1,4 @@
-        // STAGING — STEP 4: the batch worker.
+// STAGING — STEP 4: the batch worker.
         //
         // GET /MedicalScrutiny/ProcessStagingClaims
         //
@@ -6,8 +6,9 @@
         // For each claim held at StageID 52 that has not yet been processed
         // (the ONLY selection condition is StageID = 52 — upstream pushes only
         //  cataract/maternity claims here, so there is no disease gate):
-        //   1. classify disease (GetClaimDiseaseTypeForStaging) — used only to set
-        //      the claimType sent to ClaimAI and stored with the result, NOT to skip.
+        //   1. classify disease (GetStagingClaimType — from Claimsdetails.Diagnosis via
+        //      ClaimAI's keyword classifier, same as on-demand; works before coding) —
+        //      used only to set the claimType sent to ClaimAI and stored with the result, NOT to skip.
         //   2. fetch docs (env-based, reuses GetMedicalBillDocument /
         //      GetTariffDocument internally), submit to ClaimAI /api/audit/start
         //      (which processes synchronously and returns a jobId), then pull the
@@ -81,17 +82,19 @@
                             if (v != null && v != DBNull.Value) slNo = Convert.ToInt32(v);
                         }
 
-                        // 1. Classify disease (still needed: passed to ClaimAI as claimType so the
-                        //    correct ruleset is applied, and stored with the result).
-                        string disease = GetClaimDiseaseTypeForStaging(claimId, connStr);
+                        // 1. Resolve disease/claimType from the claim's Diagnosis text via ClaimAI's
+                        //    keyword classifier (/api/classify-claim-type) — the SAME path the
+                        //    on-demand browser flow (GetClaimType) uses. Works BEFORE coding is done
+                        //    (the diagnosis text is present at claim entry). Passed to ClaimAI as the
+                        //    claimType and stored with the result. Falls back to "other" (generic
+                        //    prompts) only when there is no usable diagnosis text — same as on-demand.
+                        string disease = GetStagingClaimType(claimId, connStr);
 
-                        // 2. Disease gate removed. Upstream now pushes only cataract/maternity claims
-                        //    to StageID=52, so the single selection condition is stage=52 (see the
-                        //    query above) and we no longer skip by disease. An "other" result is no
-                        //    longer skipped — it falls through and ClaimAI handles it via its generic
-                        //    prompts. (NOTE: GetClaimDiseaseTypeForStaging derives the disease from the
-                        //    CODED procedure; if claims reach stage 52 before coding, point it at the
-                        //    pre-coding disease source so cataract/maternity rules still apply.)
+                        // 2. Disease gate removed. Upstream pushes only cataract/maternity to
+                        //    StageID=52, so the single selection condition is stage=52 (see the query
+                        //    above) and we no longer skip by disease. The claimType above is now
+                        //    diagnosis-based (GetStagingClaimType), so it is reliable before coding;
+                        //    an "other" result is processed via ClaimAI's generic prompts, not skipped.
 
                         // 3. Lock: mark 'processing' so a concurrent run won't re-pick.
                         UpsertStagingResult(connStr, claimId, slNo, disease, "processing",
