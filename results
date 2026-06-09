@@ -1,6 +1,2 @@
-[ClaimAI] postMessage received: setApprovedAccommodation {"source":"claimai","type":"setApprovedAccommodation","facilityId":"2","claimType":"cataract"}
-Index:16898 [ClaimAI] setApprovedAccommodation: applying approved value: 2
-Index:16891 [ClaimAI] postMessage received: setApprovedAccommodation {"source":"claimai","type":"setApprovedAccommodation","facilityId":"2","claimType":"cataract"}
-Index:16898 [ClaimAI] setApprovedAccommodation: applying approved value: 2
-Index:17331 [ClaimAI Metrics] Field changed — Approved Accommodation: "195" → "2"
-Index:17402 [ClaimAI] Approved Accommodation set from iframe: 195
+[ClaimAI] Fill_HospDtls: ReqFacilityID= 12 ApprovedFacilityID= 2 IsAprvFacilitychanged= true StageID= 5 ServiceTypeID= 1 RequestTypeID= 1
+ClaimsCommonUtils.js?v=2.3:1117 [ClaimAI] ddlApprovedFacility set to: 195 actual val after set: 195
