@@ -1,10 +1,1 @@
-SELECT bsc.ID, bsc.BPSIID, par.Name AS ParentName, c.Name AS ConditionName,
-       bsc.isCovered, bsc.Deleted,
-       bsc.ClaimLimit, bsc.IndividualLimit, bsc.FamilyLimit, bsc.PolicyLimit,
-       bsc.TPAProcedureID, bsc.Remarks
-FROM BPSIConditions bsc WITH(NOLOCK)
-LEFT JOIN Mst_BPConditions c   WITH(NOLOCK) ON c.ID   = bsc.BPConditionID
-LEFT JOIN Mst_BPConditions par WITH(NOLOCK) ON par.ID = c.ParentID
-WHERE (c.Name LIKE '%delivery%' OR c.Name LIKE '%maternity%' OR bsc.Remarks LIKE '%delivery%'
-       OR bsc.IndividualLimit = 25000 OR bsc.ClaimLimit = 25000)
-  AND ISNULL(bsc.Deleted,0) = 0;
+https://spectra-ai.fhpl.net/FUP/UploadingDMSDocuments?ClaimId=26061143194&Slno=1&docCategory=CFR&documentName=Preauth_Form-CFR134246208840111061.pdf&Receivedate=03-Jun-2026%2000:00&Receivedtype=3
